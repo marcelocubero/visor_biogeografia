@@ -1,0 +1,179 @@
+---
+title: "Visor Cartográfico Zonas de Vida, Costa Rica"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    theme: yeti
+    social: menu
+    source_code: embed
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+# Paquetes
+
+library(flexdashboard)
+defaultEncoding <- "UTF8"
+library(dplyr)
+library(sf)
+library(terra)
+library(raster)
+library(DT)
+library(ggplot2)
+library(plotly)
+library(leaflet)
+library(leaflet.extras)
+library(leafem)
+library(shiny)
+library(shinydashboard)
+library(shinyWidgets)
+library(rgdal)
+library(tidyverse)
+library(tidyr)
+library(rmapshaper)
+library(leaflegend)
+library(lubridate)
+library(stringr)
+library(viridis)
+
+```
+
+
+```{r}
+# Datos 
+
+areas_conservacion <-
+  st_read(
+    "/vsicurl/https://marcelocubero.github.io/capas_biogeo/areas_conservacion.geojson",
+    quiet = TRUE
+  )
+
+asp <-
+  st_read(
+    "/vsicurl/https://marcelocubero.github.io/capas_biogeo/asp.geojson",
+    quiet = TRUE
+  )
+
+zonas_vida <-
+  st_read(
+    "/vsicurl/https://marcelocubero.github.io/capas_biogeo/zonas_vida.geojson",
+    quiet = TRUE
+  )
+
+zonas_vida <- st_transform(zonas_vida, crs = 4326)
+asp <- st_transform(asp, crs = 4326)
+areas_conservacion <- st_transform(areas_conservacion, crs = 4326)
+
+
+
+
+sf::sf_use_s2(FALSE)
+
+```
+
+
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Visor Cartográfico
+
+```{r}
+
+colores <- c(viridis(23))
+c_zona <- levels(as.factor(zonas_vida$valor))
+mi_paleta <- colorFactor(palette = colores, domain = c_zona)
+
+colores2 <- c(turbo(10))
+c_zona2 <- levels(as.factor(areas_conservacion$nombre_ac))
+mi_paleta2 <- colorFactor(palette = colores2, domain = c_zona2)
+
+colores3 <- c(magma(150))
+c_zona3 <- levels(as.factor(asp$nombre_asp))
+mi_paleta3 <- colorFactor(palette = colores3, domain = c_zona3)
+
+
+
+
+
+leaflet() %>%
+    addTiles(group = "OSM") %>%
+    addProviderTiles(providers$CartoDB.DarkMatter, group = "CartoDB-Black") %>%
+    addProviderTiles("Esri.WorldImagery", group = "ESRI") %>% 
+    # Zonas de Vida
+    addPolygons(
+      data = zonas_vida,
+      color = ~ mi_paleta(valor),
+      fillOpacity = 0.7,
+      weight = 1,
+      opacity = 1,
+      stroke = TRUE,
+      group = "Zonas de Vida",
+      popup = paste0("Zona de vida: ",
+                     zonas_vida$valor)
+    ) %>%
+    addLegend(
+      pal = mi_paleta,
+      values = zonas_vida$valor,
+      opacity = 1,
+      title = "Zonas de Vida"
+    ) %>%
+  
+  
+  
+      # ASP
+    addPolygons(
+      data = asp,
+      color = ~ mi_paleta3(nombre_asp),
+      fillOpacity = 0.3,
+      weight = 1,
+      opacity = 1,
+      stroke = TRUE,
+      group = "Áreas Silvestres Protegidas",
+      popup = paste0("ASP: ",
+                     asp$nombre_asp)
+    ) %>%
+  
+  
+        # Áreas Conservación
+    addPolygons(
+      data = areas_conservacion,
+      color = ~ mi_paleta2(nombre_ac),
+      fillOpacity = 0.2,
+      weight = 1,
+      opacity = 1,
+      stroke = TRUE,
+      group = "Áreas de Conservación",
+      popup = paste0("Área de Conservación: ",
+                     areas_conservacion$nombre_ac)
+    ) %>%
+  
+  
+  
+  
+   addLayersControl(
+      "bottomleft",
+      baseGroups = c("OSM", "CartoDB-Black", "ESRI"),
+      overlayGroups = c(
+        "Zonas de Vida",
+        "Áreas Silvestres Protegidas",
+        "Áreas de Conservación"
+      ),
+      options = layersControlOptions(collapsed = TRUE,
+         autoZIndex = TRUE,
+        hideSingleBase = FALSE,
+        sortLayers = TRUE,
+        groupCheckboxes = TRUE)
+    ) %>%
+  
+    addScaleBar("bottomright") %>%
+    addMiniMap() %>%
+    addResetMapButton() %>%
+    addFullscreenControl() %>%
+    addControlGPS() %>%
+    addSearchOSM() %>%
+    addMouseCoordinates()
+
+
+```
